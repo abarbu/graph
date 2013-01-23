@@ -1,0 +1,9 @@
+;;;  -*- Hen -*-
+
+(use setup-helper-mod)
+
+(verify-extension-name "graph")
+
+(setup-shared-extension-module 'graph (extension-version "1.0")
+  #:inline? #t #:types? #t
+  #:compile-options '(-O3 -d2))

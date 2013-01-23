@@ -1,0 +1,21 @@
+;;;  -*- Hen -*-
+
+((egg "graph.egg")
+ (category math)
+ (author "Andrei Barbu")
+ (maintainer "Andrei Barbu")
+ (license "GPL")
+ (doc-from-wiki)
+ (synopsis "A library of graph algorithms")
+ (depends
+  (setup-helper "1.5.2")
+  (define-structure "1.0")
+  (traversal "1.0")
+  (object-graph "1.2")
+  (nondeterminism "1.0")
+  (miscmacros "2.95"))
+ (test-depends test)
+ (files "graph.meta" 
+        "graph.release-info"
+        "graph.scm" 
+        "graph.setup"))
