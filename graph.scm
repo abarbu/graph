@@ -252,7 +252,32 @@
 					      )
 				   (edge->weight e))) (graph-edges graph))
      distances
-     )))
+     (let aloop ((k 0))
+       (if (= k vertex-count)
+	   distances
+	   (begin 
+	     (let bloop ((i 0))
+	       (if (= i vertex-count)
+		   distances
+		   (begin
+		     (let cloop ((j 0))
+		       (if (= j vertex-count)
+			   distances
+			   (let ((newPathCost (+ (vector-ref distances (+ i (* vertex-count k)))
+					     (vector-ref distances (+ k (* vertex-count j)))
+					     )))
+			     (if (< newPathCost
+				    (vector-ref distances (+ i (* vertex-count j))))
+				 (vector-set! distances (+ i (* vertex-count j)) newPathCost)
+				 )
+			     (cloop (+ j 1))
+			     )
+			   ))
+		     (bloop (+ i 1)))
+		   ))
+	     (aloop (+ k 1))
+	     )))
+       )))
 
 
 (define (for-each-dfs f root graph)

@@ -26,5 +26,10 @@
 	(alist->digraph
 	 '((a d 1)))
        edge-label))
+(test (vector 0 1 101 +inf.0 0 100 +inf.0 +inf.0 0)
+      (floyd-warshall-algorithm
+	(alist->digraph
+	 '((a d 1) (d c 100)))
+       edge-label))
 (test-end "flyod-warshall")
 (test-exit)
