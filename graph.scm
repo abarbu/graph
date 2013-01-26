@@ -114,7 +114,7 @@
              (mst '()))
    (if (= (length vertices) (length (graph-vertices g)))
        mst
-       (let* ((edge (minimump edges edge-label))
+       (let* ((edge (minimump edge-label edges))
               (vertex (edge-in edge)))
         (loop (cons vertex vertices)
               (append
