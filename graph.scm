@@ -236,6 +236,7 @@
 
 ;; Floyd-warhsall all points shortest path (currently just the weights)
 ;; Constructs a |V|x|V| vector
+;; See http://en.wikipedia.org/wiki/Floyd%E2%80%93Warshall_algorithm
 (define (floyd-warshall-algorithm graph edge->weight)
  (letrec ((vertex-count (length (graph-vertices graph)))
        (vertex-map 
