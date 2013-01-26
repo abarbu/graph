@@ -324,6 +324,39 @@
   graph)
  graph)
 
+(define (contract-edge-between! graph v1 v2)
+ (let ((v (make-vertex (gensym) '()))
+       (edges (remove-duplicatesq
+               (append (vertex-edges v1) (vertex-edges v2)))))
+  (for-each (lambda (e)
+             (delete-edge! e)
+             (set-graph-edges! graph (removeq e (graph-edges graph))))
+   edges)
+  (set-graph-vertices! graph (cons v (removeq v1 (removeq v2 (graph-vertices graph)))))
+  (for-each (lambda (e)
+             (let ((out (if (or (eq? (edge-out e) v1)
+                               (eq? (edge-out e) v2))
+                            v
+                            (edge-out e)))
+                   (in (if (or (eq? (edge-in e) v1)
+                              (eq? (edge-in e) v2))
+                           v
+                           (edge-in e))))
+              (unless (or (eq? in out) (edge-between? out in))
+               (let ((new-edge (make-edge (edge-label e) out in)))
+                (add-edge! new-edge)
+                (set-graph-edges! graph (cons new-edge (graph-edges graph)))))))
+   edges)
+  v))
+
+;; will look like a v structure
+;; (let ((graph (alist->digraph '((a b) (c d)))))
+;;        (contract-edge-between!
+;;         graph
+;;         (find (lambda (v) (equal? 'b (vertex-label v))) (graph-vertices graph))
+;;         (find (lambda (v) (equal? 'd (vertex-label v))) (graph-vertices graph)))
+;;        (show-graph graph vertex->label: #t))
+
 (define (show-graph graph #!key (edge->label #f) (vertex->label #f))
  (reset-graph)
  (for-each (lambda (edge)
