@@ -1,6 +1,6 @@
 (module graph * 
 (import chicken scheme extras srfi-1)
-(use srfi-1 srfi-18 srfi-69 miscmacros define-structure traversal vector-lib)
+(use srfi-1 srfi-18 srfi-69 miscmacros define-structure traversal vector-lib list-utils)
 (use nondeterminism object-graph files)
 
 ;; TODO this doesn't belong here
@@ -235,12 +235,22 @@
 ;;            edge-label))))
 
 (define (floyd-warshall-algorithm graph edge->weight)
- (let ((vertex-count (length (graph-vertices graph))))
+ (letrec ((vertex-count (length (graph-vertices graph)))
+       (vertex-map 
+	(alist->hash-table 
+	 (zip-alist
+	  (map (lambda (f) (vertex-label f)) (graph-vertices graph))
+	  (unfold (lambda (x) (>= x vertex-count)) (lambda (x) x) (lambda (x) (+ x 1)) 0)))))
    (let ((distances (vector-unfold (lambda (i) 
 				     (cond
 				      ((eq? (quotient i vertex-count) (modulo i vertex-count)) 0)
 				      (else +inf.0)
 				      )) (* vertex-count vertex-count))))
+     (map (lambda (e) (vector-set! distances (+ 
+					      (hash-table-ref vertex-map (vertex-label (edge-in e)))
+					      (* vertex-count (hash-table-ref vertex-map (vertex-label (edge-out e))))
+					      )
+				   (edge->weight e))) (graph-edges graph))
      distances
      )))
 
