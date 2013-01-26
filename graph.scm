@@ -218,7 +218,7 @@
                    (when (< (+ current-distance (edge->weight e)) (hash-table-ref distances (edge-in e)))
                     (hash-table-set! distances (edge-in e) (+ current-distance (edge->weight e)))))
          (intersectionp (lambda (a b) (eq? (edge-in a) b)) (vertex-out-edges node) unvisited))
-        (let ((node (minimump unvisited (lambda (v) (hash-table-ref distances v)))))
+        (let ((node (minimump (lambda (v) (hash-table-ref distances v)) unvisited)))
          (loop (removeq node unvisited) node)))))))
 
 ;; ((5 . 20) (4 . 20) (6 . 11) (1 . 0) (3 . 9) (2 . 7))
