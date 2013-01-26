@@ -14,4 +14,12 @@
      (g f 11))))
  edge-label)))
 (test-end "minimum spanning tree")
+(test-begin "flyod-warshall")
+(test (vector 0 +inf.0 +inf.0 0)
+      (floyd-warshall-algorithm
+       (digraph->graph
+	(alist->digraph
+	 '((a d 1))))
+       edge-label))
+(test-end "flyod-warshall")
 (test-exit)
