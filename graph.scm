@@ -73,7 +73,7 @@
 (define (alist->digraph alist)
  (let*
    ((vertices
-     (map (lambda (label) (make-vertex label '())) (remove-duplicates
+     (map (lambda (label) (make-vertex label '())) (remove-duplicatese
                                                (append (map first alist) (map second alist)))))
     (edges (map (lambda (l)
                  (add-edge! (make-edge (if (> (length l) 2) (third l) #f)
@@ -234,38 +234,46 @@
 ;;            (car (graph-vertices graph))
 ;;            edge-label))))
 
-(define (for-each-dfs f root graph)
- (let loop ((explored '()) (unexplored (list root)))
+(define (for-each-b/d-fs f root graph bfs? #!key (duplicate-nodes? #t))
+ ;; default is dfs
+ ;; f :: new -> parent -> r; parent is #f for the root
+ ;; duplicate-nodes? never calls f with a node twice
+ ;;   useful in undirected graphs
+ (let loop ((explored '()) (unexplored (list (cons root #f))))
   (unless (null? unexplored)
-   (let ((v (car unexplored)))
-    (f v)
-    (loop (cons v explored)
-          (remove-duplicates
-           (append
-            (remove-if (lambda (a) (memq a explored))
-                       (map edge-in (vertex-out-edges v)))
-            (cdr unexplored))))))))
+   (display (map vertex-label explored))(newline)
+   (display (map vertex-label (map car unexplored)))(newline)
+   (let* ((p (car unexplored)))
+    (f (car p) (cdr p))
+    (loop (cons (car p) explored)
+          (let* ((new (map (lambda (e) (cons (edge-in e) (car p)))
+                           (vertex-out-edges (car p))))
+                 (new (if duplicate-nodes?
+                          new
+                          (remove (lambda (a) (memq (car a) explored)) new)))
+                 (merged (if bfs?
+                             (append (cdr unexplored) new)
+                             (append new (cdr unexplored)))))
+           (if duplicate-nodes?
+               merged
+               (remove-duplicates (lambda (a b) (eq? (car a) (car b))) merged))))))))
 
-(define (for-each-bfs f root graph)
- (let loop ((explored '()) (unexplored (list root)))
-  (unless (null? unexplored)
-   (let ((v (car unexplored)))
-    (f v)
-    (loop (cons v explored)
-          (remove-duplicates
-           (append
-            (cdr unexplored)
-            (remove-if (lambda (a) (memq a explored))
-                       (map edge-in (vertex-out-edges v))))))))))
+(define (for-each-bfs f root graph #!rest args)
+ (apply for-each-b/d-fs f root graph #t args))
 
-(define (fold-dfs f i root graph)
+(define (for-each-dfs f root graph #!rest args)
+ (apply for-each-b/d-fs f root graph #f args))
+
+(define (fold-dfs f i root graph #!rest args)
  (let ((l i))
-  (for-each-dfs (lambda (vertex) (set! l (f i vertex))) root graph)
+  (apply for-each-dfs (lambda (vertex) (set! l (f i vertex)))
+         root graph args)
   l))
 
-(define (fold-bfs f i root graph)
+(define (fold-bfs f i root graph #!rest args)
  (let ((l i))
-  (for-each-bfs (lambda (vertex) (set! l (f i vertex))) root graph)
+  (apply for-each-bfs (lambda (vertex) (set! l (f i vertex))) 
+         root graph args)
   l))
 
 ;; http://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
