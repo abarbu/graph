@@ -18,5 +18,6 @@
  (files "graph.meta" 
         "graph.release-info"
         "graph.scm" 
+        "examples/graph-overview.scm" 
 	"test/graph.scm"
         "graph.setup"))
