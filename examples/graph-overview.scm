@@ -91,3 +91,55 @@
      (h g) (h d)))
   vertex->label: #t))
 
+
+(define (maximum-flow-example)
+ ;; 12
+ (pp (let ((graph
+            (alist->digraph
+             '((s a 5) (s b 10) (s d 4)
+               (a c 1) (a t 3)
+               (b c 7) (b e 7) (b d 3)
+               (d e 6) (c t 5) (e t 4)))))
+      (car (graph-maximum-flow
+            graph
+            ;; source
+            (find-if (lambda (a) (eq? (vertex-label a) 's)) (graph-vertices graph))
+            ;; sink
+            (find-if (lambda (a) (eq? (vertex-label a) 't)) (graph-vertices graph))
+            ;; capacity
+            edge-label))))
+
+ ;; 4
+ (pp (let ((graph
+            (alist->digraph
+             '((1 2 8) (1 3 3)
+               (2 4 3) (3 4 1)
+               (2 5 1) (3 5 1)
+               (4 6 2) (5 6 3)))))
+      (car (graph-maximum-flow
+            graph
+            ;; source
+            (find-if (lambda (a) (eq? (vertex-label a) '1)) (graph-vertices graph))
+            ;; sink
+            (find-if (lambda (a) (eq? (vertex-label a) '6)) (graph-vertices graph))
+            ;; capacity
+            edge-label))))
+
+ ;; 5
+ (pp (let ((graph
+            (alist->digraph
+             '((a d 3) (a b 3)
+               (b c 4)
+               (c a 3) (c d 1) (c e 2)
+               (d e 2) (d f 6)
+               (e b 1) (e g 1)
+               (f g 9)))))
+      (car (graph-maximum-flow
+            graph
+            ;; source
+            (find-if (lambda (a) (eq? (vertex-label a) 'a)) (graph-vertices graph))
+            ;; sink
+            (find-if (lambda (a) (eq? (vertex-label a) 'g)) (graph-vertices graph))
+            ;; capacity
+            edge-label)))))
+
