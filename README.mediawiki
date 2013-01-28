@@ -3,7 +3,7 @@
 This is work in progress. A library of graph algorithms. Currently
 only supports directed graphs.
 
-It's currently undocumented but will one day have documentation.
+Documentation is in the form of examples, see examples/graph-overview.scm.
 
 === License ===
 
