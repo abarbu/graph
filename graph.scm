@@ -382,5 +382,23 @@
    (length vertices)
    (length vertices))))
 
+(define (graph-complement graph #!key (vertices->edge-label #f) (simple-graph? #f))
+ (let ((vertices (map-vertex (lambda (v) (make-vertex (vertex-label v) '())) graph))
+       (edges '()))
+  (for-each
+    (lambda (v-new1 v-old1)
+     (for-each
+       (lambda (v-new2 v-old2)
+        (when (or (not (eq? v-old1 v-old2)) (not simple-graph?))
+         (unless (adjacent-vertices? v-old1 v-old2)
+          (let ((e (make-edge (if vertices->edge-label
+                                  (vertices->edge-label v-old1 v-old2)
+                                  #f)
+                              v-new1 v-new2)))
+           (add-edge! e)
+           (push! e edges)))))
+      vertices (graph-vertices graph)))
+   vertices (graph-vertices graph))
+  (make-graph vertices edges)))
 
 )

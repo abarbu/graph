@@ -157,3 +157,15 @@
                 (5 4) (5 2) (2 3)
                 (3 4) (4 6))))))
       (graph-laplacian-matrix graph))))
+
+(define (graph-complement-example)
+ (show-graph (graph-complement
+              (alist->digraph
+               '((a b)
+                 (b c) (b e) (b f)
+                 (c d) (c g)
+                 (d c) (d h)
+                 (e a) (e f)
+                 (f g)
+                 (g f)
+                 (h g) (h d))))))
