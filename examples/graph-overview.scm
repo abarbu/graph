@@ -143,3 +143,17 @@
             ;; capacity
             edge-label)))))
 
+(define (graph-laplacian-matrix-example)
+ ;; #(#(2  -1 -1  0  0  0)
+ ;;   #(-1  3 -1  0 -1  0)
+ ;;   #(-1 -1  3 -1  0  0)
+ ;;   #(0  0  -1  2 -1  0)
+ ;;   #(0 -1   0 -1  3 -1)
+ ;;   #(0  0   0  0 -1  1))
+ (pp (let ((graph
+            (digraph->graph
+             (alist->digraph
+              '((1 2) (1 5)
+                (5 4) (5 2) (2 3)
+                (3 4) (4 6))))))
+      (graph-laplacian-matrix graph))))

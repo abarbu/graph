@@ -46,6 +46,15 @@
  (graph obj port)
  (pp (graph->alist obj) port))
 
+(define (for-each-vertex f graph) (for-each f (graph-vertices graph)))
+(define (for-each-indexed-vertex f graph) (for-each-indexed f (graph-vertices graph)))
+(define (map-vertex f graph) (map f (graph-vertices graph)))
+(define (map-indexed-vertex f graph) (map-indexed f (graph-vertices graph)))
+(define (for-each-edge f graph) (for-each f (graph-edges graph)))
+(define (for-each-indexed-edge f graph) (for-each-indexed f (graph-edges graph)))
+(define (map-edge f graph) (map f (graph-edges graph)))
+(define (map-indexed-edge f graph) (map-indexed f (graph-edges graph)))
+
 (define (vertex-out-edges v) (remove-if-not (lambda (e) (eq? (edge-out e) v)) (vertex-edges v)))
 (define (vertex-in-edges v) (remove-if-not (lambda (e) (eq? (edge-in e) v)) (vertex-edges v)))
 (define (vertex-add-edge! v e) (set-vertex-edges! v (cons e (vertex-edges v))))
@@ -355,4 +364,23 @@
                                         (set! sum (+ sum val)))))
     sum)
    (hash-table->alist flow))))
+
+(define (graph-laplacian-matrix graph #!key (in-degree? #f))
+ ;; out degree is the default
+ ;; prevents a linear-algebra dependency, for now anyway
+ (define (map-n-matrix f i j)
+  (map-n-vector (lambda (i) (map-n-vector (lambda (j) (f i j)) j)) i))
+ (let ((vertices (graph-vertices graph))
+       (vertex-edges (if in-degree?
+                         vertex-in-edges
+                         vertex-out-edges)))
+  (map-n-matrix
+   (lambda (i j)
+    (cond ((= i j) (length (vertex-edges (list-ref vertices i))))
+          ((adjacent-vertices? (list-ref vertices i) (list-ref vertices j)) -1)
+          (else 0)))
+   (length vertices)
+   (length vertices))))
+
+
 )
