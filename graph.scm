@@ -66,6 +66,7 @@
 (define (vertex-incoming-edges? v) (not (null? (vertex-in-edges v))))
 (define (copy-vertex v) (make-vertex (vertex-label v) (vertex-edges v)))
 (define (copy-edge v) (make-edge (edge-label v) (edge-out v) (edge-in v)))
+(define (vertex-neighbours v) (map edge-in (vertex-out-edges v)))
 
 (define (alist->digraph alist)
  (let*
@@ -401,4 +402,18 @@
    vertices (graph-vertices graph))
   (make-graph vertices edges)))
 
+(define (graph-maximal-cliques graph)
+ ;; Bron-Kerbosch, without pivoting or vertex ordering
+ (let ((max-cliques '()))
+  (let loop ((r '()) (p (graph-vertices graph)) (x '()))
+   (if (and (null? p) (null? x))
+       (push! r max-cliques)
+       (for-each (lambda (v)
+                  (loop (cons v r)
+                        (intersectionq (vertex-neighbours v) p)
+                        (intersectionq (vertex-neighbours v) x))
+                  (push! v x)
+                  (set! p (removeq v p)))
+        p)))
+  max-cliques))
 )

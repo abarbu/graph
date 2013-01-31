@@ -153,6 +153,7 @@
  (pp (let ((graph
             (digraph->graph
              (alist->digraph
+              ;; http://en.wikipedia.org/wiki/File:6n-graf.svg
               '((1 2) (1 5)
                 (5 4) (5 2) (2 3)
                 (3 4) (4 6))))))
@@ -169,3 +170,23 @@
                  (f g)
                  (g f)
                  (h g) (h d))))))
+
+(define (graph-clique-example)
+ (list
+  (let ((graph
+         (digraph->graph
+          (alist->digraph
+           ;; http://en.wikipedia.org/wiki/File:6n-graf.svg
+           '((1 2) (1 5)
+             (5 4) (5 2) (2 3)
+             (3 4) (4 6))))))
+   ;; ((6 4) (4 3) (3 2) (4 5) (2 5 1))
+   (map (lambda (l) (map vertex-label l)) (graph-maximal-cliques graph)))
+  (let ((graph
+         (digraph->graph
+          (alist->digraph
+           '((1 2) (1 5)
+             (5 4) (5 2) (2 3)
+             (3 4) (4 6) (5 3) (2 4))))))
+   ;; ((6 4) (2 4 3 5) (2 5 1))
+   (map (lambda (l) (map vertex-label l)) (graph-maximal-cliques graph)))))
