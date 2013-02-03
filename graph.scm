@@ -46,6 +46,15 @@
  (graph obj port)
  (pp (graph->alist obj) port))
 
+(define (for-each-vertex f graph) (for-each f (graph-vertices graph)))
+(define (for-each-indexed-vertex f graph) (for-each-indexed f (graph-vertices graph)))
+(define (map-vertex f graph) (map f (graph-vertices graph)))
+(define (map-indexed-vertex f graph) (map-indexed f (graph-vertices graph)))
+(define (for-each-edge f graph) (for-each f (graph-edges graph)))
+(define (for-each-indexed-edge f graph) (for-each-indexed f (graph-edges graph)))
+(define (map-edge f graph) (map f (graph-edges graph)))
+(define (map-indexed-edge f graph) (map-indexed f (graph-edges graph)))
+
 (define (vertex-out-edges v) (remove-if-not (lambda (e) (eq? (edge-out e) v)) (vertex-edges v)))
 (define (vertex-in-edges v) (remove-if-not (lambda (e) (eq? (edge-in e) v)) (vertex-edges v)))
 (define (vertex-add-edge! v e) (set-vertex-edges! v (cons e (vertex-edges v))))
@@ -57,6 +66,7 @@
 (define (vertex-incoming-edges? v) (not (null? (vertex-in-edges v))))
 (define (copy-vertex v) (make-vertex (vertex-label v) (vertex-edges v)))
 (define (copy-edge v) (make-edge (edge-label v) (edge-out v) (edge-in v)))
+(define (vertex-neighbours v) (map edge-in (vertex-out-edges v)))
 
 (define (alist->digraph alist)
  (let*
@@ -417,4 +427,55 @@
                                         (set! sum (+ sum val)))))
     sum)
    (hash-table->alist flow))))
+
+(define (graph-laplacian-matrix graph #!key (in-degree? #f))
+ ;; out degree is the default
+ ;; prevents a linear-algebra dependency, for now anyway
+ (define (map-n-matrix f i j)
+  (map-n-vector (lambda (i) (map-n-vector (lambda (j) (f i j)) j)) i))
+ (let ((vertices (graph-vertices graph))
+       (vertex-edges (if in-degree?
+                         vertex-in-edges
+                         vertex-out-edges)))
+  (map-n-matrix
+   (lambda (i j)
+    (cond ((= i j) (length (vertex-edges (list-ref vertices i))))
+          ((adjacent-vertices? (list-ref vertices i) (list-ref vertices j)) -1)
+          (else 0)))
+   (length vertices)
+   (length vertices))))
+
+(define (graph-complement graph #!key (vertices->edge-label #f) (simple-graph? #f))
+ (let ((vertices (map-vertex (lambda (v) (make-vertex (vertex-label v) '())) graph))
+       (edges '()))
+  (for-each
+    (lambda (v-new1 v-old1)
+     (for-each
+       (lambda (v-new2 v-old2)
+        (when (or (not (eq? v-old1 v-old2)) (not simple-graph?))
+         (unless (adjacent-vertices? v-old1 v-old2)
+          (let ((e (make-edge (if vertices->edge-label
+                                  (vertices->edge-label v-old1 v-old2)
+                                  #f)
+                              v-new1 v-new2)))
+           (add-edge! e)
+           (push! e edges)))))
+      vertices (graph-vertices graph)))
+   vertices (graph-vertices graph))
+  (make-graph vertices edges)))
+
+(define (graph-maximal-cliques graph)
+ ;; Bron-Kerbosch, without pivoting or vertex ordering
+ (let ((max-cliques '()))
+  (let loop ((r '()) (p (graph-vertices graph)) (x '()))
+   (if (and (null? p) (null? x))
+       (push! r max-cliques)
+       (for-each (lambda (v)
+                  (loop (cons v r)
+                        (intersectionq (vertex-neighbours v) p)
+                        (intersectionq (vertex-neighbours v) x))
+                  (push! v x)
+                  (set! p (removeq v p)))
+        p)))
+  max-cliques))
 )
