@@ -33,22 +33,10 @@
      (system (format #f "dot -Tpng ~a > ~a" dot-file png-file))
      (system (format #f "feh --force-aliasing ~a" png-file)))))))
 
-;; http://en.wikipedia.org/wiki/Karger%27s_algorithm
-;; http://en.wikipedia.org/wiki/Book:Graph_Algorithms
-;; http://en.wikipedia.org/wiki/Book:Graph_Algorithms
-
 ;; edges are directed as far as this is concerned
 (define-structure vertex label edges)
 (define-structure edge label out in)
 (define-structure graph vertices edges)
-
-;; http://en.wikipedia.org/wiki/Graph_algorithms#Graph_algorithms
-
-;;; what I want:
-;; alist->graph vs alist->digraph
-;; (mst digraph edge->weight) and (mst graph edge->weight)
-;; should be extensible
-;; different kind of representations: adjacency list, interleaved, dense and sparse matrix
 
 (define-record-printer
  (edge obj port)
@@ -73,7 +61,7 @@
 (define (alist->digraph alist)
  (let*
    ((vertices
-     (map (lambda (label) (make-vertex label '())) (remove-duplicates
+     (map (lambda (label) (make-vertex label '())) (remove-duplicatese
                                                (append (map first alist) (map second alist)))))
     (edges (map (lambda (l)
                  (add-edge! (make-edge (if (> (length l) 2) (third l) #f)
@@ -122,20 +110,8 @@
                (remove-if (lambda (e) (eq? (edge-in e) vertex)) edges))
               (cons edge mst)))))))
 
-;; should be 39
-;; (mst
-;;  (digraph->graph
-;;   (alist->digraph
-;;    '((a d 5) (a b 7)
-;;      (b c 8) (b e 7) (b d 9)
-;;      (c e 5)
-;;      (d e 15) (d f 6)
-;;      (e g 9) (e f 8)
-;;      (g f 11))))
-;;  edge-label)
-
 (define (topological-sort-from-node graph nodes)
- ;; TODO This modifies nodes!!
+ ;; TODO This modifies nodes
  ;; node must have no incoming arcs
  (let ((graph (copy-graph graph)))
   (let loop ((s nodes) (l '()))
@@ -150,11 +126,6 @@
  (topological-sort-from-node
   graph
   (remove vertex-incoming-edges? (graph-vertices graph))))
-
-;; (topological-sort
-;;  (alist->digraph
-;;   '((7 11 #f) (7 8 #f) (5 11 #f) (3 8 #f) (3 10 #f)
-;;     (11 2 #f) (11 9 #f) (11 10 #f) (8 9 #f))))
 
 (define (tsp-f graph edge->weight zero cmp)
  ;; TODO must have positive weights
@@ -176,36 +147,12 @@
           (loop (removeq (edge-out e) vertices)
                 (+ (edge->weight e) cost)
                 (cons (edge-out e) tour))))))
-  (list best-solution best-cost)))
+  (cons best-solution best-cost)))
 
 (define (tsp graph edge->weight) (tsp-f graph edge->weight +inf.0 >=))
 (define (tsp-partial graph edge->weight best) (tsp-f graph edge->weight best >=))
 (define (max-tsp graph edge->weight) (tsp-f graph edge->weight 0 <))
 (define (max-tsp-partial graph edge->weight best) (tsp-f graph edge->weight best <))
-
-;; ;; 14
-;; (map vertex-label
-;;      (car
-;;       (tsp
-;;        (digraph->graph
-;;         (alist->digraph
-;;          '((a b 2) (a e 2) (a d 1) (a f 2)
-;;            (b c 4) (b d 5) (b e 1)
-;;            (c e 2) (c f 3) (d e 4) (e f 2))))
-;;        edge-label)))
-
-;; ;; 54
-;; (map vertex-label
-;;      (car
-;;       (tsp
-;;        (digraph->graph
-;;         (alist->digraph
-;;          '((a b 10) (a c 15) (a s 10) (a e 14) (a m 11)
-;;            (b m 15) (b s 9) (b e 13) (b c 8)
-;;            (c s 10) (c m 16) (c e 11)
-;;            (e s 6) (e m 9)
-;;            (s m 15))))
-;;        edge-label)))
 
 (define (dijkstras-algorithm graph node edge->weight)
  (let ((distances (alist->hash-table (map (lambda (v) (cons v +inf.0)) (graph-vertices graph)))))
@@ -283,38 +230,46 @@
        )))
 
 
-(define (for-each-dfs f root graph)
- (let loop ((explored '()) (unexplored (list root)))
+(define (for-each-b/d-fs f root graph bfs? #!key (duplicate-nodes? #t))
+ ;; default is dfs
+ ;; f :: new -> parent -> r; parent is #f for the root
+ ;; duplicate-nodes? never calls f with a node twice
+ ;;   useful in undirected graphs
+ (let loop ((explored '()) (unexplored (list (cons root #f))))
   (unless (null? unexplored)
-   (let ((v (car unexplored)))
-    (f v)
-    (loop (cons v explored)
-          (remove-duplicates
-           (append
-            (remove-if (lambda (a) (memq a explored))
-                       (map edge-in (vertex-out-edges v)))
-            (cdr unexplored))))))))
+   (display (map vertex-label explored))(newline)
+   (display (map vertex-label (map car unexplored)))(newline)
+   (let* ((p (car unexplored)))
+    (f (car p) (cdr p))
+    (loop (cons (car p) explored)
+          (let* ((new (map (lambda (e) (cons (edge-in e) (car p)))
+                           (vertex-out-edges (car p))))
+                 (new (if duplicate-nodes?
+                          new
+                          (remove (lambda (a) (memq (car a) explored)) new)))
+                 (merged (if bfs?
+                             (append (cdr unexplored) new)
+                             (append new (cdr unexplored)))))
+           (if duplicate-nodes?
+               merged
+               (remove-duplicates (lambda (a b) (eq? (car a) (car b))) merged))))))))
 
-(define (for-each-bfs f root graph)
- (let loop ((explored '()) (unexplored (list root)))
-  (unless (null? unexplored)
-   (let ((v (car unexplored)))
-    (f v)
-    (loop (cons v explored)
-          (remove-duplicates
-           (append
-            (cdr unexplored)
-            (remove-if (lambda (a) (memq a explored))
-                       (map edge-in (vertex-out-edges v))))))))))
+(define (for-each-bfs f root graph #!rest args)
+ (apply for-each-b/d-fs f root graph #t args))
 
-(define (fold-dfs f i root graph)
+(define (for-each-dfs f root graph #!rest args)
+ (apply for-each-b/d-fs f root graph #f args))
+
+(define (fold-dfs f i root graph #!rest args)
  (let ((l i))
-  (for-each-dfs (lambda (vertex) (set! l (f i vertex))) root graph)
+  (apply for-each-dfs (lambda (vertex) (set! l (f i vertex)))
+         root graph args)
   l))
 
-(define (fold-bfs f i root graph)
+(define (fold-bfs f i root graph #!rest args)
  (let ((l i))
-  (for-each-bfs (lambda (vertex) (set! l (f i vertex))) root graph)
+  (apply for-each-bfs (lambda (vertex) (set! l (f i vertex))) 
+         root graph args)
   l))
 
 ;; http://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
@@ -347,20 +302,6 @@
    (graph-vertices graph))
   components))
 
-;; http://en.wikipedia.org/wiki/File:Scc.png
-;; ((a b e) (c d h) (f g))
-;; (pp (map (lambda (scc) (map vertex-label scc))
-;;          (let ((graph (alist->digraph
-;;                        '((a b)
-;;                          (b c) (b e) (b f)
-;;                          (c d) (c g)
-;;                          (d c) (d h)
-;;                          (e a) (e f)
-;;                          (f g)
-;;                          (g f)
-;;                          (h g) (h d)))))
-;;           (strongly-connected-components graph))))
-
 (define (number-vertices graph)
  (for-each-indexed
   (lambda (vertex n) (setp-vertex-label! vertex (lambda (l) (cons n l))))
@@ -373,7 +314,32 @@
   graph)
  graph)
 
-(define (show-graph graph #!key (edge->label #f) (vertex->label #f))
+(define (contract-edge-between! graph v1 v2)
+ (let ((v (make-vertex (gensym) '()))
+       (edges (remove-duplicatesq
+               (append (vertex-edges v1) (vertex-edges v2)))))
+  (for-each (lambda (e)
+             (delete-edge! e)
+             (set-graph-edges! graph (removeq e (graph-edges graph))))
+   edges)
+  (set-graph-vertices! graph (cons v (removeq v1 (removeq v2 (graph-vertices graph)))))
+  (for-each (lambda (e)
+             (let ((out (if (or (eq? (edge-out e) v1)
+                               (eq? (edge-out e) v2))
+                            v
+                            (edge-out e)))
+                   (in (if (or (eq? (edge-in e) v1)
+                              (eq? (edge-in e) v2))
+                           v
+                           (edge-in e))))
+              (unless (or (eq? in out) (edge-between? out in))
+               (let ((new-edge (make-edge (edge-label e) out in)))
+                (add-edge! new-edge)
+                (set-graph-edges! graph (cons new-edge (graph-edges graph)))))))
+   edges)
+  v))
+
+(define (show-graph graph #!key (edge->label #f) (vertex->label #t))
  (reset-graph)
  (for-each (lambda (edge)
             (let* ((n1 (register-node1 (edge-out edge)))
@@ -382,8 +348,8 @@
              (when edge->label
               (set-label e
                          (if (procedure? edge->label)
-                             (edge->label e)
-                             (format #f "~a" (edge-label e)))))))
+                             (edge->label edge)
+                             (format #f "~a" (edge-label edge)))))))
   (graph-edges graph))
  (when vertex->label
   (for-each (lambda (vertex)
@@ -394,16 +360,61 @@
    (graph-vertices graph)))
  (show-object-graph/dot))
 
-;; ;; http://en.wikipedia.org/wiki/File:Scc.png
-;; (show-graph 
-;;  (alist->digraph
-;;   '((a b)
-;;     (b c) (b e) (b f)
-;;     (c d) (c g)
-;;     (d c) (d h)
-;;     (e a) (e f)
-;;     (f g)
-;;     (g f)
-;;     (h g) (h d)))
-;;  vertex->label: #t)
+(define (graph-maximum-flow graph source sink edge->capacity)
+ ;; push-relabel algorithm without the gap heuristic
+ ;; doesn't take advantage of sparsity
+ ;; need to get rid of all list-refs
+ (let ((edge->capacity (lambda (e) (if e (edge->capacity e) 0)))
+       (n (length (graph-vertices graph)))
+       (flow (ht)) (height (ht)) (excess (ht)) (seen (ht))
+       (nodes (removeq source (removeq sink (graph-vertices graph)))))
+  (for-each (lambda (u) 
+             (! excess u 0)
+             (! height u 0)
+             (! seen u 0)
+             (for-each (lambda (v) (! flow (cons u v) 0)) (graph-vertices graph)))
+   (graph-vertices graph))
+  (define (push u v)
+   (let* ((send (min (@ excess u) (- (edge->capacity (edge-between? u v)) (@ flow (cons u v))))))
+    (! flow (cons u v) (+ (@ flow (cons u v)) send))
+    (! flow (cons v u) (- (@ flow (cons v u)) send))
+    (! excess u (- (@ excess u) send))
+    (! excess v (+ (@ excess v) send))))
+  (define (relabel u)
+   (let ((min-height +inf.0))
+    (for-each (lambda (v)
+               (when (> (- (edge->capacity (edge-between? u v)) (@ flow (cons u v))) 0)
+                (set! min-height (min min-height (@ height v)))
+                (! height u (+ min-height 1))))
+     (graph-vertices graph))))
+  (define (discharge u)
+   (let loop ()
+    (when (> (@ excess u) 0)
+     (if (< (@ seen u) n)
+         (let* ((v (list-ref (graph-vertices graph) (@ seen u))))
+          (if (and (> (- (edge->capacity (edge-between? u v)) (@ flow (cons u v))) 0)
+                 (> (@ height u) (@ height v)))
+              (push u v)
+              (! seen u (+ (@ seen u) 1))))
+         (begin (relabel u)
+                (! seen u 0)))
+     (loop))))
+  (! height source n)
+  (! excess source +inf.0)
+  (for-each (lambda (v) (push source v)) (graph-vertices graph))
+  (let loop ((p 0))
+   (when (< p (length nodes))
+    (let* ((u (list-ref nodes p))
+           (old-height (@ height u)))
+     (discharge u)
+     (if (> (@ height u) old-height)
+         (begin (set! nodes (cons u (list-remove nodes p)))
+                (loop 0))
+         (loop (+ p 1))))))
+  (cons
+   (let ((sum 0))
+    (hash-table-walk flow (lambda (key val) (when (eq? (car key) source)
+                                        (set! sum (+ sum val)))))
+    sum)
+   (hash-table->alist flow))))
 )

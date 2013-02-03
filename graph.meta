@@ -8,9 +8,9 @@
  (doc-from-wiki)
  (synopsis "A library of graph algorithms")
  (depends
-  (setup-helper "1.5.2")
+  setup-helper
   (define-structure "1.0")
-  (traversal "1.0")
+  (traversal "1.1")
   (object-graph "1.2")
   (nondeterminism "1.0")
   (miscmacros "2.95")
@@ -20,5 +20,6 @@
  (files "graph.meta" 
         "graph.release-info"
         "graph.scm" 
+        "examples/graph-overview.scm" 
 	"test/graph.scm"
         "graph.setup"))
