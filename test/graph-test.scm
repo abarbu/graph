@@ -16,20 +16,26 @@
 (test-end "minimum spanning tree")
 (test-begin "flyod-warshall")
 (test (vector 0 1 1 0)
-      (floyd-warshall-algorithm
+      (car (floyd-warshall-algorithm
        (digraph->graph
 	(alist->digraph
 	 '((a d 1))))
-       edge-label))
+       edge-label)))
 (test (vector 0 1 +inf.0 0)
-      (floyd-warshall-algorithm
+      (car (floyd-warshall-algorithm
 	(alist->digraph
 	 '((a d 1)))
-       edge-label))
+       edge-label)))
 (test (vector 0 1 101 +inf.0 0 100 +inf.0 +inf.0 0)
-      (floyd-warshall-algorithm
+      (car (floyd-warshall-algorithm
 	(alist->digraph
 	 '((a d 1) (d c 100)))
-       edge-label))
+       edge-label)))
+(test (vector -1 1 1 -1 -1 2 -1 -1 -1)
+      (cadr (floyd-warshall-algorithm
+	(alist->digraph
+	 '((a d 1) (d c 100)))
+       edge-label)))
+
 (test-end "flyod-warshall")
 (test-exit)

@@ -249,7 +249,7 @@
 		   ))
 	     (loop (+ k 1))
 	     )))
-     (list distances next)
+     (list distances next vertex-map)
        )))
 
 
