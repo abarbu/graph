@@ -192,7 +192,7 @@
 ;;            edge-label))))
 
 ;; Floyd-warhsall all points shortest path (currently just the weights)
-;; Constructs a |V|x|V| vector
+;; Constructs two |V|x|V| vectors
 ;; See http://en.wikipedia.org/wiki/Floyd%E2%80%93Warshall_algorithm
 (define (floyd-warshall-algorithm graph edge->weight)
  (letrec ((vertex-count (length (graph-vertices graph)))
@@ -205,12 +205,22 @@
 				     (cond
 				      ((eq? (quotient i vertex-count) (modulo i vertex-count)) 0)
 				      (else +inf.0)
-				      )) (* vertex-count vertex-count))))
-     (map (lambda (e) (vector-set! distances (+ 
-					      (hash-table-ref vertex-map (vertex-label (edge-in e)))
-					      (* vertex-count (hash-table-ref vertex-map (vertex-label (edge-out e))))
-					      )
-				   (edge->weight e))) (graph-edges graph))
+				      )) (* vertex-count vertex-count)))
+	 (next (vector-unfold (lambda (i) -1) (* vertex-count vertex-count)))
+	 )
+     (map (lambda (e)
+	    (vector-set! distances (+ 
+				    (hash-table-ref vertex-map (vertex-label (edge-in e)))
+				    (* vertex-count (hash-table-ref vertex-map (vertex-label (edge-out e))))
+				    )
+			 (edge->weight e))
+	    (vector-set! next (+ 
+				    (hash-table-ref vertex-map (vertex-label (edge-in e)))
+				    (* vertex-count (hash-table-ref vertex-map (vertex-label (edge-out e))))
+				    ) 
+			 (hash-table-ref vertex-map (vertex-label (edge-in e)))
+			 )
+		  ) (graph-edges graph))
      distances
      (let loop ((k 0))
        (if (= k vertex-count)
@@ -226,9 +236,11 @@
 			   (let ((newPathCost (+ (vector-ref distances (+ i (* vertex-count k)))
 					     (vector-ref distances (+ k (* vertex-count j)))
 					     )))
-			     (if (< newPathCost
+			     (cond ((< newPathCost
 				    (vector-ref distances (+ i (* vertex-count j))))
-				 (vector-set! distances (+ i (* vertex-count j)) newPathCost)
+				    (vector-set! next (+ i (* vertex-count j)) k)
+				    (vector-set! distances (+ i (* vertex-count j)) newPathCost)
+				     )
 				 )
 			     (loop (+ j 1))
 			     )
@@ -237,6 +249,7 @@
 		   ))
 	     (loop (+ k 1))
 	     )))
+     (list distances next)
        )))
 
 
