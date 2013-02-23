@@ -178,19 +178,6 @@
         (let ((node (minimump (lambda (v) (hash-table-ref distances v)) unvisited)))
          (loop (removeq node unvisited) node)))))))
 
-;; ((5 . 20) (4 . 20) (6 . 11) (1 . 0) (3 . 9) (2 . 7))
-;; (pp (map (lambda (a) (cons (vertex-label (car a)) (cdr a)))
-;;          (let ((graph (digraph->graph
-;;                        (alist->digraph
-;;                         '((1 2 7) (1 3 9) (1 6 14)
-;;                           (2 3 10) (2 4 15)
-;;                           (3 6 2) (3 4 11)
-;;                           (4 5 6) (5 6 9))))))
-;;           (dijkstras-algorithm 
-;;            graph
-;;            (car (graph-vertices graph))
-;;            edge-label))))
-
 ;; Floyd-warhsall all points shortest path (currently just the weights)
 ;; Constructs two |V|x|V| vectors and a hash-table
 ;; See http://en.wikipedia.org/wiki/Floyd%E2%80%93Warshall_algorithm
