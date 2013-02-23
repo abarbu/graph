@@ -112,7 +112,7 @@
              (mst '()))
    (if (= (length vertices) (length (graph-vertices g)))
        mst
-       (let* ((edge (minimump edge-label edges))
+       (let* ((edge (minimum edge-label edges))
               (vertex (edge-in edge)))
         (loop (cons vertex vertices)
               (append
@@ -174,8 +174,8 @@
         (for-each (lambda (e)
                    (when (< (+ current-distance (edge->weight e)) (hash-table-ref distances (edge-in e)))
                     (hash-table-set! distances (edge-in e) (+ current-distance (edge->weight e)))))
-         (intersectionp (lambda (a b) (eq? (edge-in a) b)) (vertex-out-edges node) unvisited))
-        (let ((node (minimump (lambda (v) (hash-table-ref distances v)) unvisited)))
+         (set-intersection (lambda (a b) (eq? (edge-in a) b)) (vertex-out-edges node) unvisited))
+        (let ((node (minimum (lambda (v) (hash-table-ref distances v)) unvisited)))
          (loop (removeq node unvisited) node)))))))
 
 ;; Floyd-warhsall all points shortest path (currently just the weights)
@@ -482,8 +482,8 @@
        (push! r max-cliques)
        (for-each (lambda (v)
                   (loop (cons v r)
-                        (intersectionq (vertex-neighbours v) p)
-                        (intersectionq (vertex-neighbours v) x))
+                        (set-intersectionq (vertex-neighbours v) p)
+                        (set-intersectionq (vertex-neighbours v) x))
                   (push! v x)
                   (set! p (removeq v p)))
         p)))
