@@ -192,7 +192,7 @@
 ;;            edge-label))))
 
 ;; Floyd-warhsall all points shortest path (currently just the weights)
-;; Constructs two |V|x|V| vectors
+;; Constructs two |V|x|V| vectors and a hash-table
 ;; See http://en.wikipedia.org/wiki/Floyd%E2%80%93Warshall_algorithm
 (define (floyd-warshall-algorithm graph edge->weight)
  (letrec ((vertex-count (length (graph-vertices graph)))
@@ -200,7 +200,13 @@
 	(alist->hash-table 
 	 (zip-alist
 	  (map (lambda (f) (vertex-label f)) (graph-vertices graph))
-	  (unfold (lambda (x) (>= x vertex-count)) (lambda (x) x) (lambda (x) (+ x 1)) 0)))))
+	  (unfold (lambda (x) (>= x vertex-count)) (lambda (x) x) (lambda (x) (+ x 1)) 0))))
+       (vertex-reverse-map 
+	(alist->hash-table 
+	 (zip-alist
+	  (unfold (lambda (x) (>= x vertex-count)) (lambda (x) x) (lambda (x) (+ x 1)) 0)
+	  (map (lambda (f) (vertex-label f)) (graph-vertices graph)))))
+       )
    (let ((distances (vector-unfold (lambda (i) 
 				     (cond
 				      ((eq? (quotient i vertex-count) (modulo i vertex-count)) 0)
@@ -221,7 +227,6 @@
 			 (hash-table-ref vertex-map (vertex-label (edge-in e)))
 			 )
 		  ) (graph-edges graph))
-     distances
      (let loop ((k 0))
        (if (= k vertex-count)
 	   distances
@@ -249,9 +254,33 @@
 		   ))
 	     (loop (+ k 1))
 	     )))
-     (list distances next vertex-map)
+     (list distances next vertex-map vertex-reverse-map)
        )))
 
+(define (floyd-warshall-extract-path start dest floydwarshall-info)
+  (let*
+      ((distance (car floydwarshall-info))
+       (next (cadr floydwarshall-info))
+       (vertex-map (caddr floydwarshall-info))
+       (vertex-reverse-map (cadddr floydwarshall-info))
+       (vertex-count (hash-table-size vertex-map))
+       (i (hash-table-ref vertex-map start))
+       (j (hash-table-ref vertex-map dest))
+       )
+    (if (= (vector-ref distance (+ j (* vertex-count i)))  +inf.0)
+	(list "pand!s")
+	(letrec
+	    ((find-path (lambda (x)
+			  (if (= x j)
+			      (cons x '())
+			      (cons x (find-path (vector-ref next (+ j (* vertex-count x)))))
+			  )
+			  )))
+	  (map (lambda (x) (hash-table-ref vertex-reverse-map x)) (find-path i))
+	  )
+	)
+    )
+)
 
 (define (for-each-b/d-fs f root graph bfs? #!key (duplicate-nodes? #t))
  ;; default is dfs

@@ -36,6 +36,17 @@
 	(alist->digraph
 	 '((a d 1) (d c 100)))
        edge-label)))
-
+(test '(a) 
+      (floyd-warshall-extract-path 'a 'a
+				   (floyd-warshall-algorithm
+				    (alist->digraph
+				     '((a d 1) (d c 100)))
+				    edge-label)))
+(test '(a d) 
+      (floyd-warshall-extract-path 'a 'd
+				   (floyd-warshall-algorithm
+				    (alist->digraph
+				     '((a d 1) (d c 100)))
+				    edge-label)))
 (test-end "flyod-warshall")
 (test-exit)
