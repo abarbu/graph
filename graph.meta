@@ -13,7 +13,9 @@
   (traversal "1.1")
   (object-graph "1.2")
   (nondeterminism "1.0")
-  miscmacros)
+  (miscmacros "2.95")
+  (list-utils "1.1.0")
+  (vector-lib "1.2"))
  (test-depends test)
  (files "graph.meta" 
         "graph.release-info"
