@@ -112,11 +112,11 @@
              (mst '()))
    (if (= (length vertices) (length (graph-vertices g)))
        mst
-       (let* ((edge (minimum edge-label edges))
+       (let* ((edge (minimum edge->weight edges))
               (vertex (edge-in edge)))
         (loop (cons vertex vertices)
               (append
-               (remove-if (lambda (e) (memq (edge-in e) vertices)) (vertex-out-edges vertex))
+               (remove-if (lambda (e) (member (edge-in e) vertices)) (vertex-out-edges vertex))
                (remove-if (lambda (e) (eq? (edge-in e) vertex)) edges))
               (cons edge mst)))))))
 
@@ -149,8 +149,8 @@
      (if (null? vertices)
          (let ((e (find-if (lambda (e) (eq? (edge-in e) (car tour)))
                            (vertex-out-edges (last tour)))))
-          (unless (and e (not (cmp (+ (edge-label e) cost) best-cost))) (fail))
-          (set! best-cost (+ (edge-label e) cost))
+          (unless (and e (not (cmp (+ (edge->weight e) cost) best-cost))) (fail))
+          (set! best-cost (+ (edge->weight e) cost))
           (set! best-solution tour))
          (let ((e (a-member-of (vertex-edges (car tour)))))
           (when (memq (edge-out e) tour) (fail))
@@ -257,8 +257,6 @@
  ;;   useful in undirected graphs
  (let loop ((explored '()) (unexplored (list (cons root #f))))
   (unless (null? unexplored)
-   (display (map vertex-label explored))(newline)
-   (display (map vertex-label (map car unexplored)))(newline)
    (let* ((p (car unexplored)))
     (f (car p) (cdr p))
     (loop (cons (car p) explored)
