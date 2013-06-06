@@ -40,11 +40,15 @@
 
 (define-record-printer
  (edge obj port)
- (display (list (edge-label obj) (vertex-label (edge-out obj)) (vertex-label (edge-in obj))) port))
+ (display (list (edge-label obj)
+                (vertex-label (edge-out obj))
+                (vertex-label (edge-in obj))) port))
 
 (define-record-printer
  (graph obj port)
- (pp (graph->alist obj) port))
+ (display "(alist->graph '" port)
+ (pp-without-newline (graph->alist obj) port)
+ (display ")" port))
 
 (define (for-each-vertex f graph) (for-each f (graph-vertices graph)))
 (define (for-each-indexed-vertex f graph) (for-each-indexed f (graph-vertices graph)))
@@ -67,6 +71,7 @@
 (define (copy-vertex v) (make-vertex (vertex-label v) (vertex-edges v)))
 (define (copy-edge v) (make-edge (edge-label v) (edge-out v) (edge-in v)))
 (define (vertex-neighbours v) (map edge-in (vertex-out-edges v)))
+(define (add-edge-between! u v) (let ((e (make-edge #f u v))) (add-edge! e) e))
 
 (define (alist->digraph alist)
  (let*
@@ -319,6 +324,16 @@
   (for-each (lambda (vertex) (unless (? indices vertex) (go vertex)))
    (graph-vertices graph))
   components))
+
+(define (connect-graph! graph)
+ (set-graph-edges!
+  graph
+  (append (graph-edges graph)
+          (let ((l (map first (strongly-connected-components graph))))
+           (if (< (length l) 2)
+               l
+               (map (lambda (a b) (add-edge-between! a b)) (cdr l) l)))))
+ graph)
 
 (define (number-vertices graph)
  (for-each-indexed
