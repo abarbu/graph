@@ -15,7 +15,8 @@
   (nondeterminism "1.0")
   (miscmacros "2.95")
   (list-utils "1.1.0")
-  (vector-lib "1.2"))
+  (vector-lib "1.2")
+  (scheme2c-compatibility "1.0"))
  (test-depends test)
  (files "graph.meta" 
         "graph.release-info"

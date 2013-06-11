@@ -4,6 +4,6 @@
 
 (verify-extension-name "graph")
 
-(setup-shared-extension-module 'graph (extension-version "1.1")
+(setup-shared-extension-module 'graph (extension-version "2.0")
   #:inline? #t #:types? #t
   #:compile-options '(-O3 -d2))

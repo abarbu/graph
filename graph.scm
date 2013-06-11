@@ -1,7 +1,7 @@
-(module graph * 
+(module graph *
 (import chicken scheme extras srfi-1)
 (use srfi-1 srfi-18 srfi-69 miscmacros define-structure traversal vector-lib list-utils)
-(use nondeterminism object-graph files)
+(use nondeterminism object-graph files scheme2c-compatibility)
 
 ;; TODO this doesn't belong here
 (define (snoc l x) (cons x l))
@@ -35,20 +35,45 @@
 
 ;; edges are directed as far as this is concerned
 (define-structure vertex label edges)
-(define-structure edge label out in)
+(define-structure directed-edge label out in)
+(define-structure undirected-edge label u v)
 (define-structure graph vertices edges)
 
+(define (edge-label e)
+ (cond ((directed-edge? e) (directed-edge-label e))
+       ((undirected-edge? e) (undirected-edge-label e))
+       (else (fuck-up))))
+
 (define-record-printer
- (edge obj port)
- (display (list (edge-label obj)
-                (vertex-label (edge-out obj))
-                (vertex-label (edge-in obj))) port))
+ (directed-edge obj port)
+ (display (list '->
+                (vertex-label (directed-edge-out obj))
+                (vertex-label (directed-edge-in obj))
+                (directed-edge-label obj))
+          port))
+
+(define-record-printer
+ (undirected-edge obj port)
+ (display (list '-
+                (vertex-label (undirected-edge-u obj))
+                (vertex-label (undirected-edge-v obj))
+                (undirected-edge-label obj))
+          port))
 
 (define-record-printer
  (graph obj port)
  (display "(alist->graph '" port)
- (pp-without-newline (graph->alist obj) port)
+ (pp-without-newline (graph-edges obj)
+  ;; (list (graph-vertices obj) (graph-edges obj))
+  port)
  (display ")" port))
+
+(define (assert-directed-graph graph)
+ (unless (every directed-edge? (graph-edges graph))
+  (error "Must be a directed graph")))
+(define (assert-undirected-graph graph)
+ (unless (every undirected-edge? (graph-edges graph))
+  (error "Must be an undirected graph")))
 
 (define (for-each-vertex f graph) (for-each f (graph-vertices graph)))
 (define (for-each-indexed-vertex f graph) (for-each-indexed f (graph-vertices graph)))
@@ -59,117 +84,215 @@
 (define (map-edge f graph) (map f (graph-edges graph)))
 (define (map-indexed-edge f graph) (map-indexed f (graph-edges graph)))
 
-(define (vertex-out-edges v) (remove-if-not (lambda (e) (eq? (edge-out e) v)) (vertex-edges v)))
-(define (vertex-in-edges v) (remove-if-not (lambda (e) (eq? (edge-in e) v)) (vertex-edges v)))
+;; Note that with undirected edges the out edges and in edges of a
+;; vertex will not be disjoint
+(define (vertex-out-edges v) (remove-if-not (lambda (e)
+                                        (cond ((directed-edge? e) (eq? (directed-edge-out e) v))
+                                              ((undirected-edge? e) (or (eq? (undirected-edge-u e) v)
+                                                                       (eq? (undirected-edge-v e) v)))
+                                              (else (fuck-up)))) (vertex-edges v)))
+(define (vertex-in-edges v) (remove-if-not (lambda (e)
+                                       (cond ((directed-edge? e) (eq? (directed-edge-in e) v))
+                                             ((undirected-edge? e) (or (eq? (undirected-edge-u e) v)
+                                                                      (eq? (undirected-edge-v e) v)))
+                                             (else (fuck-up)))) (vertex-edges v)))
 (define (vertex-add-edge! v e) (set-vertex-edges! v (cons e (vertex-edges v))))
 (define (vertex-delete-edge! v e) (set-vertex-edges! v (removeq e (vertex-edges v))))
-(define (edge-between? v1 v2) (find-if (lambda (e) (eq? (edge-in e) v2)) (vertex-out-edges v1)))
-(define (adjacent-vertices? v1 v2) (find-if (lambda (e) (eq? (edge-in e) v2)) (vertex-out-edges v1)))
-(define (add-edge! e) (vertex-add-edge! (edge-in e) e) (vertex-add-edge! (edge-out e) e) e)
-(define (delete-edge! e) (vertex-delete-edge! (edge-in e) e) (vertex-delete-edge! (edge-out e) e))
+(define (edge-between? v1 v2) (find-if (lambda (e) (cond ((directed-edge? e) (eq? (directed-edge-in e) v2))
+                                               ((undirected-edge? e)
+                                                (or (eq? (undirected-edge-u e) v2)
+                                                   (eq? (undirected-edge-v e) v2)))
+                                               (else (fuck-up))))
+                                  (vertex-out-edges v1)))
+(define (directed-edge-between? v1 v2)
+ (find-if (lambda (e) (if (directed-edge? e)
+                     (eq? (directed-edge-in e) v2)
+                     #f))
+          (vertex-out-edges v1)))
+(define (undirected-edge-between? v1 v2)
+ (find-if (lambda (e) (if (undirected-edge? e)
+                        (or (eq? (undirected-edge-u e) v2)
+                           (eq? (undirected-edge-v e) v2))
+                        #f))
+          (vertex-out-edges v1)))
+(define (add-edge! e)
+ (cond ((directed-edge? e)
+        (vertex-add-edge! (directed-edge-out e) e)
+        (vertex-add-edge! (directed-edge-in e) e))
+       ((undirected-edge? e)
+        (vertex-add-edge! (undirected-edge-u e) e)
+        (vertex-add-edge! (undirected-edge-v e) e))
+       (else (fuck-up)))
+ e)
+(define (delete-edge! e)
+ (cond ((directed-edge? e)
+        (vertex-delete-edge! (directed-edge-in e) e)
+        (vertex-delete-edge! (directed-edge-out e) e))
+       ((undirected-edge? e)
+        (vertex-delete-edge! (undirected-edge-u e) e)
+        (vertex-delete-edge! (undirected-edge-v e) e))
+       (else (fuck-up))))
 (define (vertex-incoming-edges? v) (not (null? (vertex-in-edges v))))
 (define (copy-vertex v) (make-vertex (vertex-label v) (vertex-edges v)))
-(define (copy-edge v) (make-edge (edge-label v) (edge-out v) (edge-in v)))
-(define (vertex-neighbours v) (map edge-in (vertex-out-edges v)))
-(define (add-edge-between! u v) (let ((e (make-edge #f u v))) (add-edge! e) e))
+(define (copy-edge e)
+ (cond ((directed-edge? e)
+        (make-directed-edge (directed-edge-label e) (directed-edge-out e) (directed-edge-in e)))
+       ((undirected-edge? e)
+        (make-undirected-edge (undirected-edge-label e) (undirected-edge-u e) (undirected-edge-v e)))
+       (else (fuck-up))))
+(define (vertex-neighbours v) (map (lambda (e)
+                               (cond ((directed-edge? e) (directed-edge-in e))
+                                     ((undirected-edge? e)
+                                      (if (eq? (undirected-edge-u e) v)
+                                          (undirected-edge-v e)
+                                          (undirected-edge-u e)))
+                                     (else (fuck-up))))
+                              (vertex-out-edges v)))
+(define (add-directed-edge-between! u v) (let ((e (make-directed-edge #f u v))) (add-edge! e) e))
 
-(define (alist->digraph alist)
+(define (alist->graph alist)
  (let*
    ((vertices
      (map (lambda (label) (make-vertex label '())) (remove-duplicatese
-                                               (append (map first alist) (map second alist)))))
+                                               (append (map second alist) (map third alist)))))
     (edges (map (lambda (l)
-                 (add-edge! (make-edge (if (> (length l) 2) (third l) #f)
-                                       (find-if (lambda (v) (equal? (first l) (vertex-label v))) vertices)
-                                       (find-if (lambda (v) (equal? (second l) (vertex-label v))) vertices))))
+                 (add-edge! ((case (first l)
+                              ((->) make-directed-edge)
+                              ((-) make-undirected-edge)
+                              (else (fuck-up)))
+                             (if (> (length l) 3) (fourth l) #f)
+                             (find-if (lambda (v) (equal? (second l) (vertex-label v))) vertices)
+                             (find-if (lambda (v) (equal? (third l) (vertex-label v))) vertices))))
                 alist)))
   (make-graph vertices edges)))
 
-;; (alist->digraph (digraph->alist g)) = g
+(define (alist->directed-graph alist) (alist->graph (map (lambda (l) (cons '-> l)) alist)))
+(define (alist->undirected-graph alist)   (alist->graph (map (lambda (l) (cons '-  l)) alist)))
+
+;; (alist->graph (graph->alist g)) = g
 ;;   only when no duplicate labels exist
-(define (digraph->alist graph)
- (map (lambda (e) (list (vertex-label (edge-out e)) (vertex-label (edge-in e)) (edge-label e)))
+(define (graph->alist graph)
+ (map (lambda (e)
+       (cond ((directed-edge? e)
+              (list '-> (vertex-label (directed-edge-out e)) (vertex-label (directed-edge-in e)) (directed-edge-label e)))
+             ((undirected-edge? e)
+              (list '- (vertex-label (undirected-edge-u e)) (vertex-label (undirected-edge-v e)) (undirected-edge-label e)))
+             (else (fuck-up))))
       (graph-edges graph)))
 
 (define (copy-graph graph)
  (let* ((vertex-alist (map (lambda (v) (cons v (make-vertex (vertex-label v) '()))) (graph-vertices graph)))
         (edges (map (lambda (e)
-                     (add-edge! (make-edge (edge-label e)
-                                           (cdr (assoc (edge-in e) vertex-alist))
-                                           (cdr (assoc (edge-out e) vertex-alist)))))
+                     (add-edge!
+                      (cond ((directed-edge? e)
+                             (make-directed-edge
+                              (directed-edge-label e)
+                              (cdr (assoc (directed-edge-in e) vertex-alist))
+                              (cdr (assoc (directed-edge-out e) vertex-alist))))
+                            ((undirected-edge? e)
+                             (make-undirected-edge
+                              (undirected-edge-label e)
+                              (cdr (assoc (undirected-edge-u e) vertex-alist))
+                              (cdr (assoc (undirected-edge-v e) vertex-alist))))
+                            (else (fuck-up)))))
                     (graph-edges graph))))
   (make-graph (map cdr vertex-alist) edges)))
 
 ;; the graphs will not share any nodes
-(define (digraph->graph graph)
+;; TODO Needs a name
+(define (directed-graph->graph graph)
  (let* ((graph (copy-graph graph)) (edges '()))
   (for-each (lambda (e)
-             (unless (edge-between? (edge-in e) (edge-out e))
-              (set! edges (cons (add-edge! (make-edge (edge-label e) (edge-in e) (edge-out e)))
+             (unless (edge-between? (directed-edge-in e) (directed-edge-out e))
+              (set! edges (cons (add-edge! (make-directed-edge (edge-label e) (directed-edge-in e) (directed-edge-out e)))
                                 edges))))
    (graph-edges graph))
   (make-graph (graph-vertices graph) (append edges (graph-edges graph)))))
 
+;; the graphs will not share any nodes
+(define (directed-graph->undirected-graph graph)
+ (let* ((graph (copy-graph graph)) (edges '()))
+  (for-each (lambda (e)
+             (when (directed-edge? e)
+              (unless (undirected-edge-between? (directed-edge-in e) (directed-edge-out e))
+               (set! edges (cons (add-edge! (make-undirected-edge (edge-label e) (directed-edge-in e) (directed-edge-out e)))
+                                 edges)))
+              (delete-edge! e)))
+   (graph-edges graph))
+  (make-graph (graph-vertices graph) (remove directed-edge? (append edges (graph-edges graph))))))
+
+;; these take a vertex in order to give you the opposite edge of an
+;; undirected edge
+(define (edge-opposite-in edge vertex)
+ (cond ((directed-edge? edge) (directed-edge-in edge))
+       ((undirected-edge? edge)
+        (if (eq? (undirected-edge-u edge) vertex)
+            (undirected-edge-v edge)
+            (undirected-edge-u edge)))
+       (else (fuck-up))))
+(define (edge-opposite-out edge vertex)
+ (cond ((directed-edge? edge) (directed-edge-out edge))
+       ((undirected-edge? edge)
+        (if (eq? (undirected-edge-u edge) vertex)
+            (undirected-edge-v edge)
+            (undirected-edge-u edge)))
+       (else (fuck-up))))
+
+(define (same-edge-make e)
+ (cond ((directed-edge? e) make-directed-edge)
+       ((undirected-edge? e) make-undirected-edge)
+       (else (fuck-up))))
+(define (edge-out/u e)
+ (cond ((directed-edge? e) (directed-edge-out e))
+       ((undirected-edge? e) (undirected-edge-u e))
+       (else (fuck-up))))
+(define (edge-in/v e)
+ (cond ((directed-edge? e) (directed-edge-in e))
+       ((undirected-edge? e) (undirected-edge-v e))
+       (else (fuck-up))))
+
 (define (mst g edge->weight)
  (let ((root (car (graph-vertices g))))
   (let loop ((vertices (list root))
-             (edges (vertex-out-edges root))
+             (vertices&edges (map (lambda (edge) (cons (edge-opposite-in edge root) edge))
+                                  (vertex-out-edges root)))
              (mst '()))
    (if (= (length vertices) (length (graph-vertices g)))
        mst
-       (let* ((edge (minimum edge->weight edges))
-              (vertex (edge-in edge)))
+       (let* ((vertex&edge (minimum (lambda (v&e) (edge->weight (cdr v&e))) vertices&edges))
+              (vertex (car vertex&edge)))
         (loop (cons vertex vertices)
               (append
-               (remove-if (lambda (e) (member (edge-in e) vertices)) (vertex-out-edges vertex))
-               (remove-if (lambda (e) (eq? (edge-in e) vertex)) edges))
-              (cons edge mst)))))))
+               (remove-if (lambda (v&e) (member (car v&e) vertices))
+                          (map (lambda (e) (cons (edge-opposite-in e vertex) e))
+                               (vertex-out-edges vertex)))
+               (remove-if (lambda (v&e) (eq? (car v&e) vertex)) vertices&edges))
+              (cons (cdr vertex&edge) mst)))))))
 
-(define (topological-sort-from-node graph nodes)
+(define (digraph-topological-sort-from-node graph roots)
+ (assert-directed-graph graph)
  ;; TODO This modifies nodes
- ;; node must have no incoming arcs
+ ;; all nodes in roots must have no incoming arcs
  (let ((graph (copy-graph graph)))
-  (let loop ((s nodes) (l '()))
+  (let loop ((s roots) (l '()))
    (if (null? s)
        (reverse l)
        (let ((edges (vertex-out-edges (car s))))
         (for-each delete-edge! edges)
-        (loop (append (remove vertex-incoming-edges? (map edge-in edges)) (cdr s))
+        (loop (append (remove vertex-incoming-edges? (map directed-edge-in edges)) (cdr s))
               (cons (car s) l)))))))
 
-(define (graph-topological-sort graph)
- (topological-sort-from-node
-  graph
-  (remove vertex-incoming-edges? (graph-vertices graph))))
-
-(define (tsp-f graph edge->weight zero cmp)
- ;; TODO must have positive weights
- (let ((best-solution #f)
-       (best-cost zero))
-  (for-effects
-    (let loop ((vertices (cdr (graph-vertices graph)))
-               (cost 0)
-               (tour (list (car (graph-vertices graph)))))
-     (when (cmp cost best-cost) (fail))
-     (if (null? vertices)
-         (let ((e (find-if (lambda (e) (eq? (edge-in e) (car tour)))
-                           (vertex-out-edges (last tour)))))
-          (unless (and e (not (cmp (+ (edge->weight e) cost) best-cost))) (fail))
-          (set! best-cost (+ (edge->weight e) cost))
-          (set! best-solution tour))
-         (let ((e (a-member-of (vertex-edges (car tour)))))
-          (when (memq (edge-out e) tour) (fail))
-          (loop (removeq (edge-out e) vertices)
-                (+ (edge->weight e) cost)
-                (cons (edge-out e) tour))))))
-  (cons best-solution best-cost)))
-
-(define (tsp graph edge->weight) (tsp-f graph edge->weight +inf.0 >=))
-(define (tsp-partial graph edge->weight best) (tsp-f graph edge->weight best >=))
-(define (max-tsp graph edge->weight) (tsp-f graph edge->weight 0 <))
-(define (max-tsp-partial graph edge->weight best) (tsp-f graph edge->weight best <))
+(define (digraph-topological-sort graph)
+ ;; some vertex must have no incoming edges
+ (let ((roots (remove vertex-incoming-edges? (graph-vertices graph))))
+  (if (null? roots)
+      #f
+      (digraph-topological-sort-from-node
+       graph
+       roots))))
 
 (define (dijkstras-algorithm graph node edge->weight)
+ (assert-directed-graph graph)
  (let ((distances (alist->hash-table (map (lambda (v) (cons v +inf.0)) (graph-vertices graph)))))
   (hash-table-set! distances node 0)
   (let loop ((unvisited (removeq node (graph-vertices graph))) (node node))
@@ -177,9 +300,9 @@
        (hash-table->alist distances)
        (let ((current-distance (hash-table-ref distances node)))
         (for-each (lambda (e)
-                   (when (< (+ current-distance (edge->weight e)) (hash-table-ref distances (edge-in e)))
-                    (hash-table-set! distances (edge-in e) (+ current-distance (edge->weight e)))))
-         (set-intersection (lambda (a b) (eq? (edge-in a) b)) (vertex-out-edges node) unvisited))
+                   (when (< (+ current-distance (edge->weight e)) (hash-table-ref distances (directed-edge-in e)))
+                    (hash-table-set! distances (directed-edge-in e) (+ current-distance (edge->weight e)))))
+         (set-intersection (lambda (a b) (eq? (directed-edge-in a) b)) (vertex-out-edges node) unvisited))
         (let ((node (minimum (lambda (v) (hash-table-ref distances v)) unvisited)))
          (loop (removeq node unvisited) node)))))))
 
@@ -187,19 +310,20 @@
 ;; Constructs two |V|x|V| vectors and a hash-table
 ;; See http://en.wikipedia.org/wiki/Floyd%E2%80%93Warshall_algorithm
 (define (floyd-warshall-algorithm graph edge->weight)
+ (assert-directed-graph graph)
  (letrec ((vertex-count (length (graph-vertices graph)))
-          (vertex-map 
-           (alist->hash-table 
+          (vertex-map
+           (alist->hash-table
             (zip-alist
              (map (lambda (f) (vertex-label f)) (graph-vertices graph))
              (unfold (lambda (x) (>= x vertex-count)) (lambda (x) x) (lambda (x) (+ x 1)) 0))))
-          (vertex-reverse-map 
-           (alist->hash-table 
+          (vertex-reverse-map
+           (alist->hash-table
             (zip-alist
              (unfold (lambda (x) (>= x vertex-count)) (lambda (x) x) (lambda (x) (+ x 1)) 0)
              (map (lambda (f) (vertex-label f)) (graph-vertices graph))))))
   (let ((distances
-         (vector-unfold (lambda (i) 
+         (vector-unfold (lambda (i)
                          (cond
                           ((eq? (quotient i vertex-count) (modulo i vertex-count)) 0)
                           (else +inf.0)))
@@ -207,18 +331,18 @@
         (next (vector-unfold (lambda (i) -1) (* vertex-count vertex-count))))
    (map (lambda (e)
          (vector-set!
-          distances (+ (hash-table-ref vertex-map (vertex-label (edge-in e)))
-                       (* vertex-count (hash-table-ref vertex-map (vertex-label (edge-out e)))))
+          distances (+ (hash-table-ref vertex-map (vertex-label (directed-edge-in e)))
+                       (* vertex-count (hash-table-ref vertex-map (vertex-label (directed-edge-out e)))))
           (edge->weight e))
          (vector-set!
-          next (+ (hash-table-ref vertex-map (vertex-label (edge-in e)))
-                  (* vertex-count (hash-table-ref vertex-map (vertex-label (edge-out e))))) 
-          (hash-table-ref vertex-map (vertex-label (edge-in e)))))
+          next (+ (hash-table-ref vertex-map (vertex-label (directed-edge-in e)))
+                  (* vertex-count (hash-table-ref vertex-map (vertex-label (directed-edge-out e)))))
+          (hash-table-ref vertex-map (vertex-label (directed-edge-in e)))))
         (graph-edges graph))
    (let loop ((k 0))
     (if (= k vertex-count)
         distances
-        (begin 
+        (begin
          (let loop ((i 0))
           (if (= i vertex-count)
               distances
@@ -256,6 +380,7 @@
        (map (lambda (x) (hash-table-ref vertex-reverse-map x)) (find-path i))))))
 
 (define (for-each-b/d-fs f root graph bfs? #!key (duplicate-nodes? #t))
+ (assert-directed-graph graph)
  ;; default is dfs
  ;; f :: new -> parent -> r; parent is #f for the root
  ;; duplicate-nodes? never calls f with a node twice
@@ -265,7 +390,7 @@
    (let* ((p (car unexplored)))
     (f (car p) (cdr p))
     (loop (cons (car p) explored)
-          (let* ((new (map (lambda (e) (cons (edge-in e) (car p)))
+          (let* ((new (map (lambda (e) (cons (directed-edge-in e) (car p)))
                            (vertex-out-edges (car p))))
                  (new (if duplicate-nodes?
                           new
@@ -291,7 +416,7 @@
 
 (define (fold-bfs f i root graph #!rest args)
  (let ((l i))
-  (apply for-each-bfs (lambda (vertex) (set! l (f i vertex))) 
+  (apply for-each-bfs (lambda (vertex) (set! l (f i vertex)))
          root graph args)
   l))
 
@@ -305,7 +430,7 @@
    (push! v S)
    (for-each
      (lambda (e)
-      (let ((w (edge-in e)))
+      (let ((w (edge-opposite-in e v)))
        (cond ((not (? indices w))
               (go w)
               (! lowlinks v (min (@ lowlinks v) (@ lowlinks w))))
@@ -332,7 +457,7 @@
           (let ((l (map first (strongly-connected-components graph))))
            (if (< (length l) 2)
                l
-               (map (lambda (a b) (add-edge-between! a b)) (cdr l) l)))))
+               (map (lambda (a b) (add-directed-edge-between! a b)) (cdr l) l)))))
  graph)
 
 (define (number-vertices graph)
@@ -357,16 +482,16 @@
    edges)
   (set-graph-vertices! graph (cons v (removeq v1 (removeq v2 (graph-vertices graph)))))
   (for-each (lambda (e)
-             (let ((out (if (or (eq? (edge-out e) v1)
-                               (eq? (edge-out e) v2))
+             (let ((out (if (or (eq? (edge-out/u e) v1)
+                               (eq? (edge-out/u e) v2))
                             v
-                            (edge-out e)))
-                   (in (if (or (eq? (edge-in e) v1)
-                              (eq? (edge-in e) v2))
+                            (edge-out/u e)))
+                   (in (if (or (eq? (edge-in/v e) v1)
+                              (eq? (edge-in/v e) v2))
                            v
-                           (edge-in e))))
+                           (edge-in/v e))))
               (unless (or (eq? in out) (edge-between? out in))
-               (let ((new-edge (make-edge (edge-label e) out in)))
+               (let ((new-edge ((same-edge-make e) (edge-label e) out in)))
                 (add-edge! new-edge)
                 (set-graph-edges! graph (cons new-edge (graph-edges graph)))))))
    edges)
@@ -374,15 +499,18 @@
 
 (define (show-graph graph #!key (edge->label #f) (vertex->label #t))
  (reset-graph)
+ (new-property "arrowhead" 'string #f)
  (for-each (lambda (edge)
-            (let* ((n1 (register-node1 (edge-out edge)))
-                   (n2 (register-node1 (edge-in edge)))
+            (let* ((n1 (register-node1 (edge-out/u edge)))
+                   (n2 (register-node1 (edge-in/v edge)))
                    (e (register-edge n1 n2)))
              (when edge->label
               (set-label e
                          (if (procedure? edge->label)
                              (edge->label edge)
-                             (format #f "~a" (edge-label edge)))))))
+                             (format #f "~a" (edge-label edge)))))
+             (when (undirected-edge? edge)
+              (set-edge-property (lookup-property "arrowhead") e "none"))))
   (graph-edges graph))
  (when vertex->label
   (for-each (lambda (vertex)
@@ -401,7 +529,7 @@
        (n (length (graph-vertices graph)))
        (flow (ht)) (height (ht)) (excess (ht)) (seen (ht))
        (nodes (removeq source (removeq sink (graph-vertices graph)))))
-  (for-each (lambda (u) 
+  (for-each (lambda (u)
              (! excess u 0)
              (! height u 0)
              (! seen u 0)
@@ -453,8 +581,8 @@
 
 (define (graph-laplacian-matrix graph #!key (in-degree? #f))
  ;; out degree is the default
- ;; prevents a linear-algebra dependency, for now anyway
  (define (map-n-matrix f i j)
+  ;; prevents a linear-algebra dependency, for now anyway
   (map-n-vector (lambda (i) (map-n-vector (lambda (j) (f i j)) j)) i))
  (let ((vertices (graph-vertices graph))
        (vertex-edges (if in-degree?
@@ -463,12 +591,13 @@
   (map-n-matrix
    (lambda (i j)
     (cond ((= i j) (length (vertex-edges (list-ref vertices i))))
-          ((adjacent-vertices? (list-ref vertices i) (list-ref vertices j)) -1)
+          ((edge-between? (list-ref vertices i) (list-ref vertices j)) -1)
           (else 0)))
    (length vertices)
    (length vertices))))
 
 (define (graph-complement graph #!key (vertices->edge-label #f) (simple-graph? #f))
+ (assert-directed-graph graph)
  (let ((vertices (map-vertex (lambda (v) (make-vertex (vertex-label v) '())) graph))
        (edges '()))
   (for-each
@@ -476,11 +605,11 @@
      (for-each
        (lambda (v-new2 v-old2)
         (when (or (not (eq? v-old1 v-old2)) (not simple-graph?))
-         (unless (adjacent-vertices? v-old1 v-old2)
-          (let ((e (make-edge (if vertices->edge-label
-                                  (vertices->edge-label v-old1 v-old2)
-                                  #f)
-                              v-new1 v-new2)))
+         (unless (edge-between? v-old1 v-old2)
+          (let ((e (make-directed-edge (if vertices->edge-label
+                                           (vertices->edge-label v-old1 v-old2)
+                                           #f)
+                                       v-new1 v-new2)))
            (add-edge! e)
            (push! e edges)))))
       vertices (graph-vertices graph)))
